@@ -90,8 +90,8 @@ func (db db) getPoint(ctx context.Context, input GetPointInput) (*GetPointOutput
 	getItemInput := input.GetItemInput
 	getItemInput.TableName = aws.String(db.config.TableName)
 	getItemInput.Key = map[string]*dynamodb.AttributeValue{
-		db.config.HashKeyAttributeName:  &dynamodb.AttributeValue{N: aws.String(strconv.FormatUint(hashKey, 10))},
-		db.config.RangeKeyAttributeName: &dynamodb.AttributeValue{S: aws.String(input.RangeKeyValue.String())},
+		db.config.HashKeyAttributeName:  {N: aws.String(strconv.FormatUint(hashKey, 10))},
+		db.config.RangeKeyAttributeName: {S: aws.String(input.RangeKeyValue)},
 	}
 
 	var out *dynamodb.GetItemOutput
@@ -114,7 +114,7 @@ func (db db) putPoint(ctx context.Context, input PutPointInput) (*PutPointOutput
 	putItemInput.Item = input.PutItemInput.Item
 
 	putItemInput.Item[db.config.HashKeyAttributeName] = &dynamodb.AttributeValue{N: aws.String(strconv.FormatUint(hashKey, 10))}
-	putItemInput.Item[db.config.RangeKeyAttributeName] = &dynamodb.AttributeValue{S: aws.String(input.RangeKeyValue.String())}
+	putItemInput.Item[db.config.RangeKeyAttributeName] = &dynamodb.AttributeValue{S: aws.String(input.RangeKeyValue)}
 	putItemInput.Item[db.config.GeoHashAttributeName] = &dynamodb.AttributeValue{N: aws.String(strconv.FormatUint(geoHash, 10))}
 
 	jsonAttr, err := json.Marshal(newGeoJSONAttribute(input.GeoPoint, db.config.LongitudeFirst))
@@ -144,7 +144,7 @@ func (db db) batchWritePoints(ctx context.Context, inputs []PutPointInput) (*Bat
 			Item: putItemInput.Item,
 		}
 		putRequest.Item[db.config.HashKeyAttributeName] = &dynamodb.AttributeValue{N: aws.String(strconv.FormatUint(hashKey, 10))}
-		putRequest.Item[db.config.RangeKeyAttributeName] = &dynamodb.AttributeValue{S: aws.String(input.RangeKeyValue.String())}
+		putRequest.Item[db.config.RangeKeyAttributeName] = &dynamodb.AttributeValue{S: aws.String(input.RangeKeyValue)}
 		putRequest.Item[db.config.GeoHashAttributeName] = &dynamodb.AttributeValue{N: aws.String(strconv.FormatUint(geoHash, 10))}
 
 		jsonAttr, err := json.Marshal(newGeoJSONAttribute(input.GeoPoint, db.config.LongitudeFirst))
@@ -181,7 +181,7 @@ func (db db) updatePoint(ctx context.Context, input UpdatePointInput) (*UpdatePo
 	if input.UpdateItemInput.Key == nil {
 		input.UpdateItemInput.Key = map[string]*dynamodb.AttributeValue{
 			db.config.HashKeyAttributeName:  &dynamodb.AttributeValue{N: aws.String(strconv.FormatUint(hashKey, 10))},
-			db.config.RangeKeyAttributeName: &dynamodb.AttributeValue{S: aws.String(input.RangeKeyValue.String())},
+			db.config.RangeKeyAttributeName: &dynamodb.AttributeValue{S: aws.String(input.RangeKeyValue)},
 		}
 	}
 
@@ -210,7 +210,7 @@ func (db db) deletePoint(ctx context.Context, input DeletePointInput) (*DeletePo
 	deleteItemInput.TableName = aws.String(db.config.TableName)
 	deleteItemInput.Key = map[string]*dynamodb.AttributeValue{
 		db.config.HashKeyAttributeName:  &dynamodb.AttributeValue{N: aws.String(strconv.FormatUint(hashKey, 10))},
-		db.config.RangeKeyAttributeName: &dynamodb.AttributeValue{S: aws.String(input.RangeKeyValue.String())},
+		db.config.RangeKeyAttributeName: &dynamodb.AttributeValue{S: aws.String(input.RangeKeyValue)},
 	}
 
 	var out *dynamodb.DeleteItemOutput

@@ -4,8 +4,6 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/gofrs/uuid"
-
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/golang/geo/s2"
 )
@@ -35,7 +33,7 @@ func newGeoJSONAttribute(p GeoPoint, lonFirst bool) GeoJSONAttribute {
 }
 
 type PointInput struct {
-	RangeKeyValue uuid.UUID
+	RangeKeyValue string
 	GeoPoint      GeoPoint
 }
 

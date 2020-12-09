@@ -88,7 +88,7 @@ func loadData() {
 				},
 			},
 		}
-		input.RangeKeyValue = id
+		input.RangeKeyValue = id.String()
 		input.GeoPoint = dyngeo.GeoPoint{
 			Latitude:  s.Position.Latitude,
 			Longitude: s.Position.Longitude,
