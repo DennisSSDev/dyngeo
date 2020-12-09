@@ -16,8 +16,8 @@ type GeoPoint struct {
 }
 
 type GeoJSONAttribute struct {
-	Type        string
-	Coordinates []float64
+	Type        string    `json:"type"`
+	Coordinates []float64 `json:"coordinates"`
 }
 
 func newGeoJSONAttribute(p GeoPoint, lonFirst bool) GeoJSONAttribute {
@@ -29,7 +29,7 @@ func newGeoJSONAttribute(p GeoPoint, lonFirst bool) GeoJSONAttribute {
 	}
 
 	return GeoJSONAttribute{
-		Type:        "Point",
+		Type:        "POINT",
 		Coordinates: coordinates,
 	}
 }
