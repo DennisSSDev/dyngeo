@@ -9,8 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/crolly/dyngeo"
 	"github.com/gofrs/uuid"
+	"github.com/mrgleam/dyngeo"
 )
 
 var (
@@ -83,8 +83,8 @@ func loadData() {
 		input := dyngeo.PutPointInput{
 			PutItemInput: dynamodb.PutItemInput{
 				Item: map[string]*dynamodb.AttributeValue{
-					"name":    &dynamodb.AttributeValue{S: aws.String(s.Name)},
-					"address": &dynamodb.AttributeValue{S: aws.String(s.Address)},
+					"name":    {S: aws.String(s.Name)},
+					"address": {S: aws.String(s.Address)},
 				},
 			},
 		}
