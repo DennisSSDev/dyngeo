@@ -23,7 +23,7 @@ func newDB(config DynGeoConfig) db {
 	}
 }
 
-func (db db) queryGeoHash(ctx context.Context, queryInput dynamodb.QueryInput, hashKey uint64, ghr geoHashRange) []*dynamodb.QueryOutput {
+func (db db) queryGeoHash(ctx context.Context, queryInput dynamodb.QueryInput, hashKey uint64, ghr geoHashRange, limit int) []*dynamodb.QueryOutput {
 	queryOutputs := []*dynamodb.QueryOutput{}
 
 	keyConditions := map[string]*dynamodb.Condition{
@@ -56,9 +56,14 @@ func (db db) queryGeoHash(ctx context.Context, queryInput dynamodb.QueryInput, h
 
 	output, queryOutputs := db.paginateQuery(ctx, queryInput, queryOutputs)
 
-	for output.LastEvaluatedKey != nil {
+	// if you provide a limit less than 0 - it means you want to loop for ALL entries in the range
+	// otherwise - loop until reach the limit or you hit the end of the query
+	iteration := 1
+	iterateUntilDone := limit < 0
+	for output.LastEvaluatedKey != nil && (iterateUntilDone || iteration < limit) {
 		queryInput.ExclusiveStartKey = output.LastEvaluatedKey
 		output, queryOutputs = db.paginateQuery(ctx, queryInput, queryOutputs)
+		iteration++
 	}
 
 	return queryOutputs

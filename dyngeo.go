@@ -118,6 +118,29 @@ func (dg DynGeo) QueryRadiusWithContext(ctx context.Context, input QueryRadiusIn
 	return dg.unmarshallOutput(output, out)
 }
 
+type GeoHashToLastEvaluatedDBValue map[uint64]map[string]*dynamodb.AttributeValue
+
+func (dg DynGeo) QueryRadiusPaginatedWithContext(ctx context.Context, input QueryRadiusInput, hashToLastEvaluatedEntry GeoHashToLastEvaluatedDBValue, limit uint, out interface{}) (GeoHashToLastEvaluatedDBValue, error) {
+	if limit == 0 {
+		return nil, errors.New("Invalid limit provided")
+	}
+	output, newHashToLEntry, err := dg.queryRadiusWithPaginatedParams(ctx, input, hashToLastEvaluatedEntry, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return newHashToLEntry, dg.unmarshallOutput(output, out)
+}
+
+func (dg DynGeo) queryRadiusWithPaginatedParams(ctx context.Context, input QueryRadiusInput, hashToLastEvaluatedEntry GeoHashToLastEvaluatedDBValue, limit uint) ([]map[string]*dynamodb.AttributeValue, GeoHashToLastEvaluatedDBValue, error) {
+	latLngRect := boundingLatLngFromQueryRadiusInput(input)
+	covering := newCovering(dg.Config.s2RegionCoverer.Covering(s2.Region(latLngRect)))
+	results, newHashToLEntry := dg.dispatchQueriesWithPagination(ctx, covering, input.GeoQueryInput, hashToLastEvaluatedEntry, limit)
+
+	filteredEntries, err := dg.filterByRadius(results, input)
+	return filteredEntries, newHashToLEntry, err
+}
+
 func (dg DynGeo) QueryRectangle(input QueryRectangleInput, out interface{}) error {
 	output, err := dg.queryRectangle(nil, input)
 	if err != nil {
@@ -152,6 +175,53 @@ func (dg DynGeo) queryRadius(ctx context.Context, input QueryRadiusInput) ([]map
 	return dg.filterByRadius(results, input)
 }
 
+func (dg DynGeo) dispatchQueriesWithPagination(ctx context.Context, covering covering, input GeoQueryInput, hashToLastEvaluatedEntry GeoHashToLastEvaluatedDBValue, limit uint) ([]map[string]*dynamodb.AttributeValue, GeoHashToLastEvaluatedDBValue) {
+	results := [][]*dynamodb.QueryOutput{}
+	wg := &sync.WaitGroup{}
+	mtx := &sync.Mutex{}
+
+	hashRanges := covering.getGeoHashRanges(dg.Config.HashKeyLength)
+	iterations := len(hashRanges)
+	newLastEvaluatedEntries := make(GeoHashToLastEvaluatedDBValue)
+	wg.Add(iterations)
+	for i := 0; i < iterations; i++ {
+		go func(i int, queryInput dynamodb.QueryInput) {
+			defer wg.Done()
+
+			g := hashRanges[i]
+			hashKey := generateHashKey(g.rangeMin, dg.Config.HashKeyLength)
+
+			// look into the map to check if there has been a query for this hash before
+			// if there was - reuse the last evaluated key for the hash
+			if hashToLastEvaluatedEntry != nil {
+				if lastEvalKey, ok := hashToLastEvaluatedEntry[hashKey]; ok {
+					queryInput.ExclusiveStartKey = lastEvalKey
+				}
+			}
+
+			// query hash and stop if reach the limit
+			output := dg.db.queryGeoHash(ctx, queryInput, hashKey, g, int(limit))
+			if len(output) > 0 {
+				mtx.Lock()
+				newLastEvaluatedEntries[hashKey] = output[len(output)-1].LastEvaluatedKey
+				results = append(results, output)
+				mtx.Unlock()
+			}
+		}(i, input.QueryInput)
+	}
+
+	wg.Wait()
+
+	var mergedResults []map[string]*dynamodb.AttributeValue
+	for _, o := range results {
+		for _, r := range o {
+			mergedResults = append(mergedResults, r.Items...)
+		}
+	}
+
+	return mergedResults, newLastEvaluatedEntries
+}
+
 func (dg DynGeo) dispatchQueries(ctx context.Context, covering covering, input GeoQueryInput) []map[string]*dynamodb.AttributeValue {
 	results := [][]*dynamodb.QueryOutput{}
 	wg := &sync.WaitGroup{}
@@ -165,7 +235,7 @@ func (dg DynGeo) dispatchQueries(ctx context.Context, covering covering, input G
 			defer wg.Done()
 			g := hashRanges[i]
 			hashKey := generateHashKey(g.rangeMin, dg.Config.HashKeyLength)
-			output := dg.db.queryGeoHash(ctx, input.QueryInput, hashKey, g)
+			output := dg.db.queryGeoHash(ctx, input.QueryInput, hashKey, g, -1)
 			mtx.Lock()
 			results = append(results, output)
 			mtx.Unlock()
