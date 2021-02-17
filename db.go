@@ -60,7 +60,10 @@ func (db db) queryGeoHash(ctx context.Context, queryInput dynamodb.QueryInput, h
 	// otherwise - loop until reach the limit or you hit the end of the query
 	iteration := 1
 	iterateUntilDone := limit < 0
-	for output.LastEvaluatedKey != nil && (iterateUntilDone || iteration < limit) {
+	for iterateUntilDone || iteration < limit {
+		if output.LastEvaluatedKey == nil {
+			break
+		}
 		queryInput.ExclusiveStartKey = output.LastEvaluatedKey
 		output, queryOutputs = db.paginateQuery(ctx, queryInput, queryOutputs)
 		iteration++
