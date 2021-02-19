@@ -195,6 +195,10 @@ func (dg DynGeo) dispatchQueriesWithPagination(ctx context.Context, covering cov
 			// if there was - reuse the last evaluated key for the hash
 			if hashToLastEvaluatedEntry != nil {
 				if lastEvalKey, ok := hashToLastEvaluatedEntry[hashKey]; ok {
+					// this will only be true when there is in fact no more entries to be processed
+					if lastEvalKey == nil {
+						return
+					}
 					queryInput.ExclusiveStartKey = lastEvalKey
 				}
 			}
